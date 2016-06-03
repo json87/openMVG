@@ -67,6 +67,7 @@ int main(int argc, char **argv)
   float fDistRatio = 0.8f;
   int iMatchingVideoMode = -1;
   std::string sPredefinedPairList = "";
+  int iImgIdFromName = 0;
   bool bUpRight = false;
   std::string sNearestMatchingMethod = "AUTO";
   bool bForce = false;
@@ -81,6 +82,7 @@ int main(int argc, char **argv)
   cmd.add( make_option('g', sGeometricModel, "geometric_model") );
   cmd.add( make_option('v', iMatchingVideoMode, "video_mode_matching") );
   cmd.add( make_option('l', sPredefinedPairList, "pair_list") );
+  cmd.add( make_option('c', iImgIdFromName, "image_id_from_name") );
   cmd.add( make_option('n', sNearestMatchingMethod, "nearest_matching_method") );
   cmd.add( make_option('f', bForce, "force") );
   cmd.add( make_option('m', bGuided_matching, "guided_matching") );
@@ -107,6 +109,10 @@ int main(int argc, char **argv)
       << "   X: with match 0 with (1->X), ...]\n"
       << "   2: will match 0 with (1,2), 1 with (2,3), ...\n"
       << "   3: will match 0 with (1,2,3), 1 with (2,3,4), ...\n"
+	  << "[-c|--image_id_from_name]\n"
+	  << "  (convert image name to image id)\n"
+	  << "   0: do not convert\n"
+	  << "   1: do conversion\n"
       << "[-l]--pair_list] file\n"
       << "[-n|--nearest_matching_method]\n"
       << "  AUTO: auto choice from regions type,\n"
@@ -136,6 +142,7 @@ int main(int argc, char **argv)
             << "--ratio " << fDistRatio << "\n"
             << "--geometric_model " << sGeometricModel << "\n"
             << "--video_mode_matching " << iMatchingVideoMode << "\n"
+			<< "--image_id_from_name" << iImgIdFromName << "\n"
             << "--pair_list " << sPredefinedPairList << "\n"
             << "--nearest_matching_method " << sNearestMatchingMethod << "\n"
             << "--guided_matching " << bGuided_matching << std::endl;
@@ -329,10 +336,31 @@ int main(int argc, char **argv)
         case PAIR_EXHAUSTIVE: pairs = exhaustivePairs(sfm_data.GetViews().size()); break;
         case PAIR_CONTIGUOUS: pairs = contiguousWithOverlap(sfm_data.GetViews().size(), iMatchingVideoMode); break;
         case PAIR_FROM_FILE:
-          if(!loadPairs(sfm_data.GetViews().size(), sPredefinedPairList, pairs))
-          {
-              return EXIT_FAILURE;
-          };
+			if (iImgIdFromName)
+			{
+				// generate image_id and image_name sets.
+				std::map<int, std::string> pairs_id_name;
+				for (Views::const_iterator iter = sfm_data.GetViews().begin();
+					iter != sfm_data.GetViews().end();
+					++iter)
+				{
+					const View * v = iter->second.get();
+					if (pairs_id_name.count(v->id_view) > 0) continue;
+					pairs_id_name[v->id_view] = stlplus::filename_part(v->s_Img_path);
+				}
+
+				if (!loadPairs(sfm_data.GetViews().size(), pairs_id_name, sPredefinedPairList, pairs))
+				{
+					return EXIT_FAILURE;
+				};
+			}
+			else
+			{
+				if (!loadPairs(sfm_data.GetViews().size(), sPredefinedPairList, pairs))
+				{
+					return EXIT_FAILURE;
+				};
+			}
           break;
       }
       // Photometric matching of putative pairs
