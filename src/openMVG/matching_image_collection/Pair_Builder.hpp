@@ -91,6 +91,78 @@ static bool loadPairs(
   return true;
 }
 
+/// Load a set of Pair_Set from a file, which stores pair names.
+/// I J 
+static bool loadPairs(
+	const size_t N,  // number of image in the current project (to check index validity)
+	const std::map<int, std::string> items, // image_id and image_name sets.
+	const std::string &sFileName, // filename of the list file,
+	Pair_Set & pairs)  // output pairs read from the list file
+{
+	std::ifstream in(sFileName.c_str());
+	if (!in.is_open())
+	{
+		std::cerr << std::endl
+			<< "loadPairs: Impossible to read the specified file: \"" << sFileName << "\"." << std::endl;
+		return false;
+	}
+	std::string sValue;
+	std::vector<std::string> vec_strName;
+	std::vector<std::string> vec_strID;
+	while (std::getline(in, sValue))
+	{
+		vec_strName.clear();
+		vec_strID.clear();
+		stl::split(sValue, ' ', vec_strName);
+		const size_t str_size = vec_strName.size();
+
+		// convert image name to id.
+		for (size_t i = 0; i < str_size; i++)
+		{
+			for (std::map<int, std::string>::const_iterator iter = items.begin();
+				iter != items.end(); iter++)
+			{
+				if (iter->second.compare(vec_strName[i]) == 0)
+				{
+					vec_strID.push_back(std::to_string(iter->first));
+					break;
+				}
+			}
+		}
+
+		if (vec_strID.size() < 2)
+		{
+			std::cerr << "loadPairs: Invalid input file: \"" << sFileName << "\"." << std::endl;
+			return false;
+		}
+
+		std::stringstream oss;
+		oss.clear(); oss.str(vec_strID[0]);
+		size_t I, J;
+		oss >> I;
+		for (size_t i = 1; i<str_size; ++i)
+		{
+			oss.clear(); oss.str(vec_strID[i]);
+			oss >> J;
+			if (I > N - 1 || J > N - 1) //I&J always > 0 since we use unsigned type
+			{
+				std::cerr << "loadPairs: Invalid input file. Image out of range. "
+					<< "I: " << I << " J:" << J << " N:" << N << std::endl
+					<< "File: \"" << sFileName << "\"." << std::endl;
+				return false;
+			}
+			if (I == J)
+			{
+				std::cerr << "loadPairs: Invalid input file. Image " << I << " see itself. File: \"" << sFileName << "\"." << std::endl;
+				return false;
+			}
+			pairs.insert((I < J) ? std::make_pair(I, J) : std::make_pair(J, I));
+		}
+	}
+	in.close();
+	return true;
+}
+
 /// Save a set of Pair_Set to a file (one pair per line)
 /// I J
 /// I K
